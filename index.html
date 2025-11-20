@@ -3,71 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor Estoque EAN-13</title>
+    <title>Leitor Estoque Pro</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; }
-        #reader { width: 100%; max-width: 500px; margin: 0 auto; }
-        #resultado { 
-            margin-top: 20px; font-size: 1.2rem; font-weight: bold; 
-            color: green; border: 2px solid #eee; padding: 10px; 
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 10px; background-color: #f4f4f4; }
+        h2 { margin-bottom: 10px; }
+        
+        /* Área da Câmera */
+        #reader { width: 100%; border-radius: 10px; overflow: hidden; background: black; }
+        
+        /* Área do Último Código Lido */
+        .ultimo-codigo-box {
+            background: white; padding: 15px; margin-top: 15px;
+            border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
+        #lbl-resultado { font-size: 0.9rem; color: #666; display: block; }
+        #resultado { font-size: 1.8rem; font-weight: bold; color: #007bff; display: block; margin-top: 5px; letter-spacing: 2px; }
+
+        /* Botões */
+        .btn-group { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
         button {
-            padding: 10px 20px; font-size: 1rem; margin-top: 10px;
-            background-color: #007bff; color: white; border: none; border-radius: 5px;
+            padding: 12px 20px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; flex: 1;
         }
+        .btn-start { background-color: #28a745; color: white; }
+        .btn-stop { background-color: #dc3545; color: white; }
+
+        /* Lista de Histórico */
+        #historico { 
+            list-style: none; padding: 0; margin-top: 20px; text-align: left; 
+            background: white; border-radius: 10px; overflow: hidden;
+        }
+        #historico li { 
+            padding: 10px 15px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 1.1rem;
+            display: flex; justify-content: space-between;
+        }
+        #historico li:first-child { background-color: #e8f5e9; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h2>Contagem de Estoque</h2>
+    <h2>📦 Leitor de Estoque</h2>
+    
     <div id="reader"></div>
-    <div id="resultado">Aguardando leitura...</div>
-    <button onclick="reiniciar()">Ler Novamente</button>
+
+    <div class="ultimo-codigo-box">
+        <span id="lbl-resultado">Último código lido:</span>
+        <span id="resultado">---</span>
+    </div>
+
+    <div class="btn-group">
+        <button onclick="iniciarLeitura()" class="btn-start">Iniciar Câmera</button>
+        <button onclick="pararLeitura()" class="btn-stop">Parar</button>
+    </div>
+
+    <ul id="historico">
+        </ul>
 
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <script>
         const html5QrCode = new Html5Qrcode("reader");
-        const resultadoDiv = document.getElementById('resultado');
+        const resultadoEl = document.getElementById('resultado');
+        const historicoEl = document.getElementById('historico');
+        let isScanning = false;
+
+        // Configuração do BIP (Som)
+        // Usando um AudioContext para garantir que funcione no iOS sem baixar arquivos mp3
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
-        // Configuração específica para melhorar performance
+        function tocarBip() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = "square";
+            oscillator.frequency.value = 660; // Frequência do som
+            gainNode.gain.value = 0.1; // Volume
+            oscillator.start();
+            setTimeout(() => { oscillator.stop(); }, 150); // Duração do bip
+            
+            // Tentar vibrar o celular (funciona em Android, alguns iOS bloqueiam)
+            if (navigator.vibrate) navigator.vibrate(200);
+        }
+
         const config = { 
-            fps: 10, // Frames por segundo (não exagere para não esquentar o iPhone)
-            qrbox: { width: 250, height: 150 }, // Área de foco (retangular para código de barras)
-            aspectRatio: 1.0
+            fps: 10, 
+            qrbox: { width: 250, height: 150 }, // Retângulo mais largo para código de barras
+            aspectRatio: 1.0 
         };
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Só processa se for um EAN-13 válido (13 números)
-            if(decodedText.length === 13 && !isNaN(decodedText)){
-                console.log(`Código lido: ${decodedText}`);
-                resultadoDiv.innerText = `ITEM: ${decodedText}`;
-                
-                // Aqui você enviaria para seu banco de dados...
-                
-                // Pausa a câmera para não ler o mesmo item 50 vezes
-                html5QrCode.pause(); 
-                alert("Leitura confirmada: " + decodedText);
-            }
+            // Evita leituras duplicadas muito rápidas
+            if(!isScanning) return;
+
+            console.log(`Lido: ${decodedText}`);
+            
+            // 1. Feedback Visual Imediato
+            resultadoEl.innerText = decodedText;
+            
+            // 2. Feedback Sonoro
+            tocarBip();
+
+            // 3. Adicionar ao Histórico
+            const li = document.createElement("li");
+            const hora = new Date().toLocaleTimeString();
+            li.innerHTML = `<span>${decodedText}</span> <span style="font-size:0.8rem; color:#999">${hora}</span>`;
+            historicoEl.prepend(li); // Adiciona no topo da lista
+
+            // 4. Pausa breve para não ler o mesmo código 100 vezes
+            pausarBrevemente();
         }
 
-        function onScanFailure(error) {
-            // Falhas são comuns enquanto a câmera procura, não precisa fazer nada
+        function pausarBrevemente(){
+            html5QrCode.pause(true); // Pausa o processamento
+            resultadoEl.style.color = "orange";
+            setTimeout(() => {
+                html5QrCode.resume(); // Volta a ler
+                resultadoEl.style.color = "#007bff";
+            }, 1500); // Espera 1.5 segundos antes de ler o próximo
         }
 
-        // Iniciar Câmera Traseira (environment)
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            config, 
-            onScanSuccess, 
-            onScanFailure
-        ).catch(err => {
-            resultadoDiv.innerText = "Erro ao iniciar câmera: " + err;
-        });
+        function iniciarLeitura() {
+            if(isScanning) return;
+            isScanning = true;
+            
+            html5QrCode.start(
+                { facingMode: "environment" }, // Câmera traseira
+                config, 
+                onScanSuccess
+            ).catch(err => {
+                alert("Erro: " + err);
+            });
+        }
 
-        function reiniciar(){
-            resultadoDiv.innerText = "Aguardando...";
-            html5QrCode.resume();
+        function pararLeitura() {
+            isScanning = false;
+            html5QrCode.stop().then(() => {
+                resultadoEl.innerText = "Parado";
+            }).catch(err => console.log(err));
         }
     </script>
 </body>
