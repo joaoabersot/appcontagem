@@ -3,336 +3,288 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App Estoque Pro</title>
+    <title>Estoque Pro (Estável)</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 0; margin: 0; background-color: #f0f2f5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 10px; background-color: #f4f4f4; margin: 0; }
         
-        /* --- TELAS (SPA) --- */
-        .screen { display: none; padding: 20px; height: 100vh; box-sizing: border-box; }
-        .screen.active { display: flex; flex-direction: column; }
+        /* --- CONTROLE DE TELAS --- */
+        .tela { display: none; } /* Esconde tudo por padrão */
+        .tela.ativa { display: block; } /* Mostra só a ativa */
 
-        /* --- TELA: MENU INICIAL --- */
-        #screen-menu { justify-content: center; align-items: center; background: white; }
-        .menu-title { font-size: 2rem; margin-bottom: 40px; color: #333; }
-        .btn-menu {
-            width: 100%; max-width: 300px; padding: 20px; margin: 10px 0;
-            font-size: 1.2rem; font-weight: bold; border: none; border-radius: 12px;
-            cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: flex; align-items: center; justify-content: center; gap: 10px;
+        /* --- ESTILO DO MENU E SELEÇÃO --- */
+        .menu-box { background: white; padding: 20px; border-radius: 10px; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn-grande {
+            display: block; width: 100%; padding: 20px; margin: 10px 0; font-size: 1.2rem; font-weight: bold;
+            color: white; border: none; border-radius: 10px; cursor: pointer;
         }
-        .btn-consulta { background-color: #007bff; color: white; }
-        .btn-contagem { background-color: #28a745; color: white; }
+        .btn-azul { background-color: #007bff; }
+        .btn-verde { background-color: #28a745; }
+        .btn-cinza { background-color: #6c757d; font-size: 1rem; padding: 10px; }
 
-        /* --- TELA: SELEÇÃO DE PRODUTO --- */
-        .selecao-container { background: white; padding: 20px; border-radius: 10px; text-align: left; }
-        select { width: 100%; padding: 15px; font-size: 1rem; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        select { width: 100%; padding: 15px; font-size: 1.1rem; margin: 15px 0; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
 
-        /* --- CAMERA E OVERLAYS --- */
+        /* --- ESTILO DA CÂMERA (IGUAL AO ANTERIOR) --- */
         .camera-wrapper {
             position: relative; width: 100%; max-width: 500px; margin: 0 auto;
-            border-radius: 10px; overflow: hidden; background: black; flex-grow: 1; display: flex; align-items: center;
+            border-radius: 10px; overflow: hidden; background: black;
         }
-        #reader { width: 100%; height: 100%; object-fit: cover; }
+        #reader { width: 100%; }
 
-        /* Overlay Genérico (Feedback) */
+        /* HUD / OVERLAY */
         #overlay-feedback {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: white; z-index: 20; visibility: hidden; opacity: 0;
-            transition: opacity 0.2s; background-color: rgba(0,0,0,0.9); padding: 20px; box-sizing: border-box;
+            color: white; z-index: 10; visibility: hidden; opacity: 0;
+            background-color: rgba(0, 0, 0, 0.9); padding: 20px; box-sizing: border-box;
         }
         #overlay-feedback.ativo { visibility: visible; opacity: 1; pointer-events: auto; }
 
-        /* Estilos de texto do Overlay */
-        .titulo-feedback { font-size: 1.8rem; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
-        .info-feedback { font-size: 1.1rem; margin-bottom: 5px; color: #ddd; }
-        .info-destaque { font-size: 1.4rem; font-weight: bold; color: #fff; margin-bottom: 20px; }
-
-        /* Botões do Overlay */
-        .overlay-buttons { display: flex; gap: 15px; width: 100%; }
-        .btn-overlay { padding: 15px; border: none; border-radius: 8px; font-weight: bold; flex: 1; font-size: 1rem; }
+        .titulo-feedback { font-size: 1.6rem; font-weight: 900; margin-bottom: 10px; }
+        .nome-produto { font-size: 1.3rem; font-weight: bold; margin-bottom: 5px; color: #fff; }
+        .overlay-buttons { display: flex; gap: 15px; width: 100%; margin-top: 20px; }
+        .btn-overlay { padding: 15px; border: none; border-radius: 8px; font-weight: bold; flex: 1; font-size: 1rem; cursor: pointer;}
         .btn-confirmar { background: #28a745; color: white; }
         .btn-cancelar { background: #dc3545; color: white; }
-        .btn-voltar { background: #6c757d; color: white; margin-bottom: 10px; padding: 10px; width: 100%; border:none; border-radius: 5px; font-size: 1rem;}
 
-        /* Painel de Contagem (Topo da Câmera) */
-        .painel-contagem {
-            background: #333; color: white; padding: 10px; 
-            display: flex; justify-content: space-between; align-items: center;
-            border-radius: 8px 8px 0 0; margin-bottom: -5px; z-index: 5;
+        /* Painel de Contagem (Topo) */
+        #painel-contagem {
+            background: #333; color: white; padding: 10px; border-radius: 8px; margin-bottom: 10px;
+            display: none; /* Só aparece na contagem */
+            justify-content: space-between; align-items: center;
         }
-        .contador-numero { font-size: 1.5rem; font-weight: bold; color: #00ffea; }
     </style>
 </head>
 <body>
 
-    <div id="screen-menu" class="screen active">
-        <div class="menu-title">📦 App Estoque</div>
-        <div id="status-db" style="margin-bottom: 20px; font-size: 0.9rem; color: #666;">Carregando dados...</div>
+    <div id="tela-menu" class="tela ativa">
+        <h2>📦 Controle de Estoque</h2>
+        <div id="status-db" style="color: #666; margin-bottom: 10px;">Carregando banco...</div>
         
-        <button onclick="irParaConsulta()" class="btn-menu btn-consulta">🔍 CONSULTAR PRODUTO</button>
-        <button onclick="irParaSelecaoContagem()" class="btn-menu btn-contagem">🔢 INICIAR CONTAGEM</button>
-    </div>
-
-    <div id="screen-selecao" class="screen">
-        <button onclick="voltarMenu()" class="btn-voltar">⬅ Voltar</button>
-        <h2>Selecione o Produto</h2>
-        <div class="selecao-container">
-            <label>Qual produto você vai contar?</label>
+        <div class="menu-box">
+            <button onclick="configurarModo('consulta')" class="btn-grande btn-azul">🔍 APENAS CONSULTAR</button>
+            <hr>
+            <label style="font-weight:bold; display:block; text-align:left;">Para Contagem, selecione:</label>
             <select id="select-produto">
-                <option value="">Carregando lista...</option>
+                <option value="">Aguardando banco...</option>
             </select>
-            <br><br>
-            <button onclick="iniciarContagem()" class="btn-menu btn-contagem" style="width:100%">COMEÇAR ▶</button>
+            <button onclick="configurarModo('contagem')" class="btn-grande btn-verde">🔢 INICIAR CONTAGEM</button>
         </div>
     </div>
 
-    <div id="screen-camera" class="screen" style="background: #222; padding: 10px;">
-        <div id="header-contagem" class="painel-contagem" style="display:none;">
-            <span id="lbl-produto-alvo" style="font-size: 0.9rem;">---</span>
-            <div>Qtd: <span id="lbl-qtd" class="contador-numero">0</span></div>
+    <div id="tela-camera" class="tela">
+        <div id="painel-contagem">
+            <span id="lbl-alvo" style="font-size: 0.9rem;">Produto Alvo</span>
+            <span style="font-size: 1.5rem; font-weight: bold; color: #00ffea;" id="lbl-contador">0</span>
         </div>
 
         <div class="camera-wrapper">
             <div id="reader"></div>
-
+            
             <div id="overlay-feedback">
-                <div class="titulo-feedback" id="ov-titulo">TITULO</div>
-                <div class="info-feedback" id="ov-desc">Descrição</div>
-                <div class="info-destaque" id="ov-produto">Nome do Produto</div>
+                <div class="titulo-feedback" id="txt-titulo">LIDO!</div>
+                <div class="nome-produto" id="txt-nome">---</div>
+                <div style="color:#ccc; margin-bottom: 10px;" id="txt-detalhe">---</div>
                 
-                <div id="btns-consulta" class="overlay-buttons" style="display:none;">
-                    <button onclick="fecharOverlay()" class="btn-overlay btn-confirmar">OK</button>
-                </div>
-
-                <div id="btns-erro" class="overlay-buttons" style="display:none;">
-                    <button onclick="fecharOverlay()" class="btn-overlay btn-cancelar">ENTENDI</button>
+                <div class="overlay-buttons">
+                    <button onclick="acaoCancelar()" class="btn-overlay btn-cancelar" id="btn-cancelar">CANCELAR ❌</button>
+                    <button onclick="acaoConfirmar()" class="btn-overlay btn-confirmar" id="btn-confirmar">CONFIRMAR ✅</button>
                 </div>
             </div>
         </div>
 
-        <button onclick="pararTudoEVoltar()" class="btn-voltar" style="margin-top: 15px;">⏹ Encerrar</button>
+        <div style="margin-top: 20px;">
+            <button onclick="voltarParaMenu()" class="btn-cinza">⏹ Parar e Voltar</button>
+        </div>
+        
+        <h3>Histórico da Sessão</h3>
+        <ul id="historico" style="list-style:none; padding:0; text-align:left; background:white;"></ul>
     </div>
 
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
     <script>
-        // --- ESTADO DO APLICATIVO ---
-        let bancoDeDados = [];
+        // --- VARIÁVEIS GLOBAIS ---
         let html5QrCode = null;
-        let modoAtual = ''; // 'consulta' ou 'contagem'
-        
-        // Variáveis de Contagem
-        let produtoAlvo = null; // O objeto do produto selecionado
-        let contadorAtual = 0;
-        let isProcessing = false; // Evitar leituras duplas rápidas
+        let bancoDeDados = [];
+        let modoAtual = 'consulta'; // consulta ou contagem
+        let produtoAlvo = null; // Objeto do produto selecionado para contagem
+        let contagemAtual = 0;
+        let leituraPendente = null; // Guarda o que foi lido enquanto espera confirmação
 
-        // --- INICIALIZAÇÃO ---
-        window.onload = () => {
-            carregarBanco();
-        };
+        // 1. CARREGAMENTO DO BANCO
+        fetch('./bancoprodutos.json')
+            .then(res => res.json())
+            .then(data => {
+                bancoDeDados = data;
+                document.getElementById('status-db').innerText = `✅ ${data.length} produtos carregados.`;
+                document.getElementById('status-db').style.color = "green";
+                atualizarSelect();
+            })
+            .catch(err => {
+                document.getElementById('status-db').innerText = "Erro ao carregar JSON.";
+            });
 
-        function carregarBanco() {
-            fetch('./bancoprodutos.json')
-                .then(res => { if(!res.ok) throw new Error(); return res.json(); })
-                .then(data => {
-                    bancoDeDados = data;
-                    document.getElementById('status-db').innerText = `✅ ${data.length} produtos carregados.`;
-                    document.getElementById('status-db').style.color = "green";
-                    preencherSelect();
-                })
-                .catch(() => {
-                    document.getElementById('status-db').innerText = "❌ Erro ao carregar JSON.";
-                    document.getElementById('status-db').style.color = "red";
-                });
-        }
-
-        function preencherSelect() {
+        function atualizarSelect() {
             const sel = document.getElementById('select-produto');
-            sel.innerHTML = '<option value="">-- Escolha um produto --</option>';
-            // Ordenar alfabeticamente
+            sel.innerHTML = '<option value="">-- Selecione para Contar --</option>';
+            // Ordenar por nome
             bancoDeDados.sort((a,b) => a.nome.localeCompare(b.nome));
-            
-            bancoDeDados.forEach(prod => {
+            bancoDeDados.forEach(p => {
                 const opt = document.createElement('option');
-                opt.value = prod.ean; // O valor será o EAN
-                opt.innerText = prod.nome;
+                opt.value = p.ean;
+                opt.innerText = p.nome;
                 sel.appendChild(opt);
             });
         }
 
-        // --- NAVEGAÇÃO (SPA) ---
-        function showScreen(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
+        // --- NAVEGAÇÃO SEGURA ---
+        function configurarModo(modo) {
+            modoAtual = modo;
 
-        function voltarMenu() {
-            pararCameraSeLigada();
-            showScreen('screen-menu');
-        }
-
-        function irParaConsulta() {
-            modoAtual = 'consulta';
-            document.getElementById('header-contagem').style.display = 'none';
-            showScreen('screen-camera');
-            iniciarCamera();
-        }
-
-        function irParaSelecaoContagem() {
-            showScreen('screen-selecao');
-        }
-
-        function iniciarContagem() {
-            const eanSelecionado = document.getElementById('select-produto').value;
-            if(!eanSelecionado) { alert("Selecione um produto!"); return; }
-
-            // Configurar ambiente de contagem
-            modoAtual = 'contagem';
-            produtoAlvo = bancoDeDados.find(p => p.ean === eanSelecionado);
-            contadorAtual = 0;
-
-            // Atualizar Header
-            document.getElementById('lbl-produto-alvo').innerText = produtoAlvo.nome;
-            document.getElementById('lbl-qtd').innerText = "0";
-            document.getElementById('header-contagem').style.display = 'flex';
-
-            showScreen('screen-camera');
-            iniciarCamera();
-        }
-
-        function pararTudoEVoltar() {
-            if(modoAtual === 'contagem') {
-                if(!confirm("Deseja encerrar a contagem atual?")) return;
+            if (modo === 'contagem') {
+                const ean = document.getElementById('select-produto').value;
+                if (!ean) { alert("Selecione um produto na lista primeiro!"); return; }
+                
+                produtoAlvo = bancoDeDados.find(p => p.ean === ean);
+                contagemAtual = 0;
+                document.getElementById('lbl-alvo').innerText = produtoAlvo.nome;
+                document.getElementById('lbl-contador').innerText = "0";
+                document.getElementById('painel-contagem').style.display = 'flex';
+            } else {
+                document.getElementById('painel-contagem').style.display = 'none';
             }
-            voltarMenu();
+
+            // Troca de tela
+            document.getElementById('tela-menu').classList.remove('ativa');
+            document.getElementById('tela-camera').classList.add('ativa');
+            
+            // Inicia Câmera
+            iniciarCameraSegura();
         }
 
-        // --- LÓGICA DA CÂMERA ---
-        function iniciarCamera() {
-            if(html5QrCode) return; // Já iniciada
+        function voltarParaMenu() {
+            pararCamera();
+            document.getElementById('tela-camera').classList.remove('ativa');
+            document.getElementById('tela-menu').classList.add('ativa');
+        }
 
+        // --- CÂMERA (Igual ao código anterior) ---
+        function iniciarCameraSegura() {
+            // Garante que o div reader existe e está visível antes de chamar a biblioteca
             html5QrCode = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
             
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-            .catch(err => { alert("Erro na câmera: " + err); voltarMenu(); });
+            .catch(err => {
+                alert("Erro ao iniciar câmera: " + err);
+                voltarParaMenu();
+            });
         }
 
-        function pararCameraSeLigada() {
-            if(html5QrCode) {
-                html5QrCode.stop().then(() => { html5QrCode.clear(); html5QrCode = null; })
-                .catch(() => { html5QrCode = null; });
+        function pararCamera() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                }).catch(err => console.log(err));
             }
         }
 
         function onScanSuccess(decodedText, decodedResult) {
-            if(isProcessing) return; // Trava leitura enquanto processa a anterior
+            // Pausa imediatamente para não ler duplicado
+            html5QrCode.pause(true);
 
-            // 1. Normalização do Código (Mattel UPC vs EAN)
-            let codigoLido = decodedText;
-            // Se não achar direto, tenta com zero ou sem zero
-            const achouNoBanco = bancoDeDados.find(item => 
-                item.ean === codigoLido || item.ean === "0" + codigoLido || "0" + item.ean === codigoLido
+            // Normalização (Zero a esquerda)
+            let item = bancoDeDados.find(p => 
+                p.ean === decodedText || p.ean === "0" + decodedText || "0" + p.ean === decodedText
             );
-            // Se achou usando a lógica do zero, atualiza o codigoLido para bater com o banco
-            if(achouNoBanco) codigoLido = achouNoBanco.ean;
 
+            // Lógica principal
+            leituraPendente = {
+                ean: decodedText,
+                nome: item ? item.nome : "NÃO CADASTRADO",
+                fornecedor: item ? item.fornecedor : "---",
+                valido: !!item
+            };
 
-            // --- BRANCH: MODO CONSULTA ---
-            if(modoAtual === 'consulta') {
-                fazerPauseMomentaneo();
-                if(achouNoBanco) {
-                    tocarSom('sucesso');
-                    mostrarOverlay('consulta', 'ENCONTRADO ✅', achouNoBanco.nome, achouNoBanco.fornecedor);
-                } else {
-                    tocarSom('erro');
-                    mostrarOverlay('consulta', 'NÃO CADASTRADO ❌', 'Desconhecido', `Cód: ${decodedText}`);
-                }
-            }
-
-            // --- BRANCH: MODO CONTAGEM ---
-            else if(modoAtual === 'contagem') {
-                // Verifica se é o produto que estamos contando
-                if(achouNoBanco && achouNoBanco.ean === produtoAlvo.ean) {
-                    // É O CERTO!
-                    contadorAtual++;
-                    document.getElementById('lbl-qtd').innerText = contadorAtual;
-                    tocarSom('sucesso');
-                    
-                    // Feedback visual rápido (flash verde na borda ou overlay temporário)
-                    flashFeedback(true);
-                    
-                    // Pequena pausa para não ler 2 vezes o mesmo frame
-                    pausarLerNovamenteRapido();
-
-                } else {
-                    // É O ERRADO!
-                    fazerPauseMomentaneo();
-                    tocarSom('erro');
-                    let nomeErrado = achouNoBanco ? achouNoBanco.nome : "Produto Desconhecido";
-                    mostrarOverlay('erro', 'PRODUTO ERRADO! ⛔', `Você leu: ${nomeErrado}`, `Deveria ser: ${produtoAlvo.nome}`);
-                }
+            // SE FOR CONTAGEM: Verifica se é o produto certo
+            if (modoAtual === 'contagem') {
+                verificarContagem(item, decodedText);
+            } else {
+                // SE FOR CONSULTA: Só mostra
+                abrirOverlayConfirmacao(leituraPendente.nome, leituraPendente.fornecedor, true);
             }
         }
 
-        // --- UTILITÁRIOS DE INTERFACE ---
-        
-        function mostrarOverlay(tipo, titulo, destaque, info) {
+        function verificarContagem(itemEncontrado, codigoLido) {
+            if (itemEncontrado && itemEncontrado.ean === produtoAlvo.ean) {
+                // CORRETO
+                tocarSom('sucesso');
+                abrirOverlayConfirmacao(itemEncontrado.nome, "Produto Correto!", true);
+            } else {
+                // ERRADO
+                tocarSom('erro');
+                let msg = itemEncontrado ? `Você leu: ${itemEncontrado.nome}` : "Produto não cadastrado";
+                abrirOverlayConfirmacao("ERRO DE PRODUTO", msg, false);
+            }
+        }
+
+        // --- INTERFACE DO OVERLAY ---
+        function abrirOverlayConfirmacao(titulo, subtitulo, isSucesso) {
             const ov = document.getElementById('overlay-feedback');
-            document.getElementById('ov-titulo').innerText = titulo;
-            document.getElementById('ov-produto').innerText = destaque;
-            document.getElementById('ov-desc').innerText = info;
+            const txtTit = document.getElementById('txt-titulo');
+            const btnConf = document.getElementById('btn-confirmar');
 
-            // Botões
-            document.getElementById('btns-consulta').style.display = 'none';
-            document.getElementById('btns-erro').style.display = 'none';
+            txtTit.innerText = titulo;
+            document.getElementById('txt-nome').innerText = subtitulo;
+            document.getElementById('txt-detalhe').innerText = isSucesso ? "" : "Cuidado: Produto divergente";
 
-            if(tipo === 'consulta') {
-                document.getElementById('btns-consulta').style.display = 'flex';
-                document.getElementById('ov-titulo').style.color = titulo.includes('NÃO') ? '#dc3545' : '#28a745';
-            } else if (tipo === 'erro') {
-                document.getElementById('btns-erro').style.display = 'flex';
-                document.getElementById('ov-titulo').style.color = '#dc3545';
+            // Ajuste de Cores
+            if (isSucesso) {
+                txtTit.style.color = "#28a745";
+                btnConf.style.display = "inline-block"; // Mostra botão confirmar
+                btnConf.innerText = modoAtual === 'contagem' ? "CONTAR +1" : "OK";
+            } else {
+                txtTit.style.color = "#dc3545";
+                btnConf.style.display = "none"; // Esconde confirmar se for erro (só pode cancelar)
             }
 
             ov.classList.add('ativo');
         }
 
+        function acaoConfirmar() {
+            if (modoAtual === 'contagem') {
+                contagemAtual++;
+                document.getElementById('lbl-contador').innerText = contagemAtual;
+                adicionarHistorico(`✅ (+1) ${leituraPendente.nome}`);
+            } else {
+                // Consulta
+                adicionarHistorico(`🔍 ${leituraPendente.nome}`);
+            }
+            fecharOverlay();
+        }
+
+        function acaoCancelar() {
+            fecharOverlay(); // Não soma nada, só fecha
+        }
+
         function fecharOverlay() {
             document.getElementById('overlay-feedback').classList.remove('ativo');
+            // Espera um pouquinho e retoma a câmera
             setTimeout(() => {
-                 if(html5QrCode) html5QrCode.resume();
-                 isProcessing = false;
+                html5QrCode.resume();
             }, 200);
         }
 
-        // Pausa a câmera e exige clique para voltar (usado em consulta e erros)
-        function fazerPauseMomentaneo() {
-            isProcessing = true;
-            if(html5QrCode) html5QrCode.pause(true);
+        function adicionarHistorico(texto) {
+            const ul = document.getElementById('historico');
+            const li = document.createElement('li');
+            li.style.borderBottom = "1px solid #eee";
+            li.style.padding = "10px";
+            li.innerText = texto;
+            ul.prepend(li);
         }
 
-        // Pausa rápida e volta sozinho (usado na contagem bem sucedida)
-        function pausarLerNovamenteRapido() {
-            isProcessing = true;
-            if(html5QrCode) html5QrCode.pause(true);
-            
-            setTimeout(() => {
-                if(html5QrCode) html5QrCode.resume();
-                isProcessing = false;
-            }, 1200); // 1.2 segundos de intervalo entre contagens
-        }
-
-        function flashFeedback(sucesso) {
-            const wrapper = document.querySelector('.camera-wrapper');
-            wrapper.style.border = sucesso ? "5px solid #00ff00" : "5px solid red";
-            setTimeout(() => {
-                wrapper.style.border = "none";
-            }, 500);
-        }
-
-        // --- SOM ---
+        // Som
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function tocarSom(tipo) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -340,13 +292,12 @@
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-            
             if(tipo === 'sucesso') {
-                osc.type = "square"; osc.frequency.value = 800; gain.gain.value = 0.1;
-                osc.start(); setTimeout(() => osc.stop(), 100);
+                osc.type = "square"; osc.frequency.value = 660; gain.gain.value = 0.1;
+                osc.start(); setTimeout(() => osc.stop(), 150);
             } else {
                 osc.type = "sawtooth"; osc.frequency.value = 200; gain.gain.value = 0.1;
-                osc.start(); setTimeout(() => osc.stop(), 400);
+                osc.start(); setTimeout(() => osc.stop(), 300);
             }
             if (navigator.vibrate) navigator.vibrate(200);
         }
