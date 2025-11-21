@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de Estoque com Banco</title>
+    <title>Leitor de Estoque Manual</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 10px; background-color: #f4f4f4; }
         
@@ -21,7 +21,7 @@
 
         #reader { width: 100%; }
 
-        /* O Aviso Visual (HUD) */
+        /* O Aviso Visual (HUD) - Agora com fundo sólido para leitura */
         #overlay-feedback {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -31,26 +31,61 @@
             align-items: center;
             color: white;
             z-index: 10;
-            opacity: 0; 
-            pointer-events: none;
+            
+            /* Inicialmente escondido */
+            visibility: hidden; 
+            opacity: 0;
             transition: opacity 0.2s ease-in-out;
+            
             padding: 20px;
             box-sizing: border-box;
+            background-color: rgba(0, 0, 0, 0.85); /* Fundo escuro para destacar os botões */
+            backdrop-filter: blur(5px); /* Borra o fundo da câmera */
         }
 
-        /* Cores de Feedback */
-        .feedback-sucesso { background-color: rgba(40, 167, 69, 0.85); }
-        .feedback-erro { background-color: rgba(220, 53, 69, 0.85); }
+        #overlay-feedback.ativo {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto; /* Ativa o clique nos botões */
+        }
 
         /* Textos do Overlay */
-        .titulo-feedback { font-size: 2rem; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
-        .nome-produto { font-size: 1.4rem; font-weight: bold; margin-bottom: 5px; }
-        .fornecedor-produto { font-size: 1rem; font-style: italic; opacity: 0.9; }
-        .codigo-lido-overlay { font-size: 0.9rem; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.5); padding-top: 5px; width: 100%; }
+        .titulo-feedback { font-size: 1.5rem; font-weight: 900; margin-bottom: 15px; text-transform: uppercase; }
+        .nome-produto { font-size: 1.3rem; font-weight: bold; margin-bottom: 5px; color: #fff; }
+        .fornecedor-produto { font-size: 1rem; font-style: italic; color: #ccc; margin-bottom: 15px; }
+        .codigo-lido-overlay { font-size: 0.9rem; margin-bottom: 20px; color: #aaa; border: 1px solid #555; padding: 5px 10px; border-radius: 4px; }
 
-        /* --- Botões --- */
+        /* Botões de Ação dentro da Câmera */
+        .overlay-buttons {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-overlay {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .btn-confirmar { background-color: #28a745; color: white; box-shadow: 0 4px 0 #1e7e34; }
+        .btn-confirmar:active { transform: translateY(4px); box-shadow: none; }
+
+        .btn-cancelar { background-color: #dc3545; color: white; box-shadow: 0 4px 0 #bd2130; }
+        .btn-cancelar:active { transform: translateY(4px); box-shadow: none; }
+
+        /* Cores do Título baseadas no status */
+        .status-sucesso { color: #28a745; }
+        .status-erro { color: #dc3545; }
+
+        /* --- Botões Principais --- */
         .btn-group { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
-        button { padding: 12px 20px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; flex: 1; color: white; font-weight: bold;}
+        button.main-btn { padding: 12px 20px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; flex: 1; color: white; font-weight: bold;}
         .btn-start { background-color: #007bff; }
         .btn-stop { background-color: #6c757d; }
 
@@ -71,7 +106,7 @@
 </head>
 <body>
 
-    <h2>📦 Estoque Inteligente</h2>
+    <h2>📦 Estoque Manual</h2>
     <div class="status-banco" id="status-db">Carregando banco de dados...</div>
     
     <div class="camera-wrapper">
@@ -79,18 +114,24 @@
         
         <div id="overlay-feedback">
             <div class="titulo-feedback" id="txt-titulo">LIDO!</div>
+            
             <div class="nome-produto" id="txt-nome">---</div>
             <div class="fornecedor-produto" id="txt-fornecedor">---</div>
-            <div class="codigo-lido-overlay" id="txt-ean">---</div>
+            <div class="codigo-lido-overlay" id="txt-ean">EAN: ---</div>
+            
+            <div class="overlay-buttons">
+                <button onclick="cancelarLeitura()" class="btn-overlay btn-cancelar">Cancelar ❌</button>
+                <button onclick="confirmarLeitura()" class="btn-overlay btn-confirmar">CONFIRMAR ✅</button>
+            </div>
         </div>
     </div>
 
     <div class="btn-group">
-        <button onclick="iniciarLeitura()" class="btn-start">▶ Iniciar Câmera</button>
-        <button onclick="pararLeitura()" class="btn-stop">⏹ Parar</button>
+        <button onclick="iniciarLeitura()" class="main-btn btn-start">▶ Iniciar Câmera</button>
+        <button onclick="pararLeitura()" class="main-btn btn-stop">⏹ Parar</button>
     </div>
 
-    <h3>Histórico</h3>
+    <h3>Histórico Confirmado</h3>
     <ul id="historico"></ul>
 
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -107,8 +148,11 @@
         
         let isScanning = false;
         let bancoDeDados = []; 
+        
+        // Variável temporária para guardar o que foi lido antes de confirmar
+        let leituraPendente = null;
 
-        // --- CORREÇÃO AQUI: Nome do arquivo ajustado para bancoprodutos.json ---
+        // Carregar JSON
         fetch('./bancoprodutos.json')
             .then(response => {
                 if (!response.ok) { throw new Error("Arquivo não encontrado"); }
@@ -121,7 +165,7 @@
             })
             .catch(error => {
                 console.error('Erro ao carregar JSON:', error);
-                statusDbEl.innerText = "❌ Erro: Não achei o arquivo 'bancoprodutos.json'. Verifique o nome!";
+                statusDbEl.innerText = "❌ Erro: Não achei o arquivo 'bancoprodutos.json'.";
                 statusDbEl.style.color = "red";
             });
 
@@ -154,50 +198,97 @@
         function onScanSuccess(decodedText, decodedResult) {
             if(!isScanning) return;
 
-            // --- LÓGICA INTELIGENTE PARA MATTEL/UPC ---
-            // Tenta achar exato OU tenta achar adicionando/removendo o zero inicial
+            // 1. PAUSAR O SCANNER IMEDIATAMENTE
+            html5QrCode.pause(true); 
+
+            // 2. BUSCAR NO BANCO
             const produtoEncontrado = bancoDeDados.find(item => 
                 item.ean === decodedText || 
                 item.ean === "0" + decodedText || 
                 "0" + item.ean === decodedText
             );
 
+            // 3. PREPARAR OS DADOS PENDENTES (Mas não salvar no histórico ainda)
             if (produtoEncontrado) {
                 tocarBip('sucesso');
-                mostrarFeedbackVisual(true, "LIDO!", produtoEncontrado.nome, produtoEncontrado.fornecedor, decodedText);
-                adicionarAoHistorico(produtoEncontrado.nome, produtoEncontrado.fornecedor, decodedText);
+                leituraPendente = {
+                    nome: produtoEncontrado.nome,
+                    fornecedor: produtoEncontrado.fornecedor,
+                    ean: decodedText,
+                    encontrado: true
+                };
             } else {
                 tocarBip('erro');
-                mostrarFeedbackVisual(false, "NÃO CADASTRADO", "Desconhecido", "---", decodedText);
-                adicionarAoHistorico("Desconhecido", "Não cadastrado", decodedText);
+                leituraPendente = {
+                    nome: "PRODUTO NÃO CADASTRADO",
+                    fornecedor: "---",
+                    ean: decodedText,
+                    encontrado: false
+                };
             }
 
-            html5QrCode.pause(true); 
-            setTimeout(() => {
-                overlay.classList.remove("ativo"); 
-                html5QrCode.resume();
-            }, 2000); 
+            // 4. MOSTRAR O POPUP PARA O USUÁRIO DECIDIR
+            abrirOverlayConfirmacao();
         }
 
-        function mostrarFeedbackVisual(sucesso, titulo, nome, fornecedor, ean) {
-            overlay.classList.remove("feedback-sucesso", "feedback-erro");
-            if(sucesso) { overlay.classList.add("feedback-sucesso"); } 
-            else { overlay.classList.add("feedback-erro"); }
+        function abrirOverlayConfirmacao() {
+            if(!leituraPendente) return;
 
-            txtTitulo.innerText = titulo;
-            txtNome.innerText = nome;
-            txtFornecedor.innerText = fornecedor;
-            txtEan.innerText = `EAN: ${ean}`;
+            // Preenche os textos
+            txtNome.innerText = leituraPendente.nome;
+            txtFornecedor.innerText = leituraPendente.fornecedor;
+            txtEan.innerText = `CÓD: ${leituraPendente.ean}`;
+
+            if(leituraPendente.encontrado) {
+                txtTitulo.innerText = "ENCONTRADO";
+                txtTitulo.className = "titulo-feedback status-sucesso";
+            } else {
+                txtTitulo.innerText = "DESCONHECIDO";
+                txtTitulo.className = "titulo-feedback status-erro";
+            }
+
+            // Mostra o overlay
             overlay.classList.add("ativo");
+        }
+
+        // --- AÇÃO: USUÁRIO CLICOU EM CONFIRMAR ---
+        function confirmarLeitura() {
+            if(leituraPendente) {
+                // Agora sim adiciona ao histórico
+                adicionarAoHistorico(leituraPendente.nome, leituraPendente.fornecedor, leituraPendente.ean);
+                leituraPendente = null; // Limpa a pendência
+            }
+            
+            fecharOverlayERetomar();
+        }
+
+        // --- AÇÃO: USUÁRIO CLICOU EM CANCELAR ---
+        function cancelarLeitura() {
+            console.log("Leitura cancelada pelo usuário");
+            leituraPendente = null; // Descarta a leitura
+            fecharOverlayERetomar();
+        }
+
+        function fecharOverlayERetomar() {
+            overlay.classList.remove("ativo");
+            
+            // Pequeno delay para a animação terminar antes de ligar a câmera de novo
+            setTimeout(() => {
+                if(isScanning) html5QrCode.resume();
+            }, 300);
         }
 
         function adicionarAoHistorico(nome, fornecedor, ean) {
             const li = document.createElement("li");
             const hora = new Date().toLocaleTimeString();
+            
+            // Ícone visual se foi cadastrado ou não
+            const cor = nome === "PRODUTO NÃO CADASTRADO" ? "red" : "black";
+
             li.innerHTML = `
-                <span class="hist-nome">${nome}</span>
+                <span class="hist-nome" style="color:${cor}">${nome}</span>
                 <span class="hist-detalhe">
-                    <span>${ean} • ${fornecedor}</span>
+                    <span>${ean}</span>
                     <span>${hora}</span>
                 </span>
             `;
@@ -207,6 +298,7 @@
         function iniciarLeitura() {
             if(isScanning) return;
             isScanning = true;
+            overlay.classList.remove("ativo"); // Garante que overlay comece fechado
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
             .catch(err => alert("Erro: " + err));
         }
