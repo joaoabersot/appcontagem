@@ -106,11 +106,14 @@
         const statusDbEl = document.getElementById('status-db');
         
         let isScanning = false;
-        let bancoDeDados = []; // Variável que vai guardar o JSON
+        let bancoDeDados = []; 
 
-        // 1. Carregar o Banco de Dados JSON ao abrir
-        fetch('./produtos.json')
-            .then(response => response.json())
+        // --- CORREÇÃO AQUI: Nome do arquivo ajustado para bancoprodutos.json ---
+        fetch('./bancoprodutos.json')
+            .then(response => {
+                if (!response.ok) { throw new Error("Arquivo não encontrado"); }
+                return response.json();
+            })
             .then(data => {
                 bancoDeDados = data;
                 statusDbEl.innerText = `✅ Banco carregado: ${data.length} produtos.`;
@@ -118,11 +121,10 @@
             })
             .catch(error => {
                 console.error('Erro ao carregar JSON:', error);
-                statusDbEl.innerText = "❌ Erro ao carregar banco de produtos.";
+                statusDbEl.innerText = "❌ Erro: Não achei o arquivo 'bancoprodutos.json'. Verifique o nome!";
                 statusDbEl.style.color = "red";
             });
 
-        // Configuração de Áudio
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function tocarBip(tipo) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -138,14 +140,12 @@
                 oscillator.start();
                 setTimeout(() => { oscillator.stop(); }, 150);
             } else {
-                // Som de erro (grave)
                 oscillator.type = "sawtooth";
                 oscillator.frequency.value = 200;
                 gainNode.gain.value = 0.1;
                 oscillator.start();
                 setTimeout(() => { oscillator.stop(); }, 300);
             }
-            
             if (navigator.vibrate) navigator.vibrate(200);
         }
 
@@ -154,46 +154,40 @@
         function onScanSuccess(decodedText, decodedResult) {
             if(!isScanning) return;
 
-            // 2. Procurar no Banco de Dados
-            // O .find procura no array 'bancoDeDados' um item onde o 'ean' seja igual ao 'decodedText'
-            const produtoEncontrado = bancoDeDados.find(item => item.ean === decodedText);
+            // --- LÓGICA INTELIGENTE PARA MATTEL/UPC ---
+            // Tenta achar exato OU tenta achar adicionando/removendo o zero inicial
+            const produtoEncontrado = bancoDeDados.find(item => 
+                item.ean === decodedText || 
+                item.ean === "0" + decodedText || 
+                "0" + item.ean === decodedText
+            );
 
             if (produtoEncontrado) {
-                // ACHOU O PRODUTO
                 tocarBip('sucesso');
                 mostrarFeedbackVisual(true, "LIDO!", produtoEncontrado.nome, produtoEncontrado.fornecedor, decodedText);
                 adicionarAoHistorico(produtoEncontrado.nome, produtoEncontrado.fornecedor, decodedText);
             } else {
-                // NÃO ACHOU (Produto Novo?)
                 tocarBip('erro');
                 mostrarFeedbackVisual(false, "NÃO CADASTRADO", "Desconhecido", "---", decodedText);
                 adicionarAoHistorico("Desconhecido", "Não cadastrado", decodedText);
             }
 
-            // Pausa técnica
             html5QrCode.pause(true); 
             setTimeout(() => {
                 overlay.classList.remove("ativo"); 
                 html5QrCode.resume();
-            }, 2000); // 2 segundos para ler o feedback
+            }, 2000); 
         }
 
         function mostrarFeedbackVisual(sucesso, titulo, nome, fornecedor, ean) {
-            // Remove classes antigas
             overlay.classList.remove("feedback-sucesso", "feedback-erro");
-            
-            // Adiciona cor certa
-            if(sucesso) {
-                overlay.classList.add("feedback-sucesso");
-            } else {
-                overlay.classList.add("feedback-erro");
-            }
+            if(sucesso) { overlay.classList.add("feedback-sucesso"); } 
+            else { overlay.classList.add("feedback-erro"); }
 
             txtTitulo.innerText = titulo;
             txtNome.innerText = nome;
             txtFornecedor.innerText = fornecedor;
             txtEan.innerText = `EAN: ${ean}`;
-            
             overlay.classList.add("ativo");
         }
 
@@ -219,9 +213,7 @@
 
         function pararLeitura() {
             isScanning = false;
-            html5QrCode.stop().then(() => {
-                console.log("Parado");
-            }).catch(err => console.log(err));
+            html5QrCode.stop().then(() => console.log("Parado")).catch(err => console.log(err));
         }
     </script>
 </body>
