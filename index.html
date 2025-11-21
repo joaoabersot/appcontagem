@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor Estoque Visual</title>
+    <title>Leitor de Estoque com Banco</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 10px; background-color: #f4f4f4; }
         
-        /* --- Container da Câmera e Overlay --- */
+        /* --- Câmera e Overlay --- */
         .camera-wrapper {
-            position: relative; /* Importante para posicionar o texto em cima */
+            position: relative;
             width: 100%;
             max-width: 500px;
             margin: 0 auto;
             border-radius: 10px;
             overflow: hidden;
             background: black;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
 
         #reader { width: 100%; }
@@ -23,71 +24,73 @@
         /* O Aviso Visual (HUD) */
         #overlay-feedback {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%; /* Cobre toda a câmera */
-            background-color: rgba(40, 167, 69, 0.6); /* Verde translúcido */
+            top: 0; left: 0; width: 100%; height: 100%;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             color: white;
-            font-weight: 900;
-            font-size: 3rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            z-index: 10; /* Garante que fique POR CIMA do vídeo */
-            
-            /* Estado inicial: invisível */
+            z-index: 10;
             opacity: 0; 
-            pointer-events: none; /* Permite clicar através dele se precisar */
+            pointer-events: none;
             transition: opacity 0.2s ease-in-out;
-        }
-        
-        /* Classe para ativar o aviso */
-        #overlay-feedback.ativo {
-            opacity: 1;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
-        .codigo-lido-overlay {
-            font-size: 1.2rem;
-            margin-top: 10px;
-            font-weight: normal;
-        }
+        /* Cores de Feedback */
+        .feedback-sucesso { background-color: rgba(40, 167, 69, 0.85); }
+        .feedback-erro { background-color: rgba(220, 53, 69, 0.85); }
 
-        /* --- Resto do Estilo --- */
+        /* Textos do Overlay */
+        .titulo-feedback { font-size: 2rem; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .nome-produto { font-size: 1.4rem; font-weight: bold; margin-bottom: 5px; }
+        .fornecedor-produto { font-size: 1rem; font-style: italic; opacity: 0.9; }
+        .codigo-lido-overlay { font-size: 0.9rem; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.5); padding-top: 5px; width: 100%; }
+
+        /* --- Botões --- */
         .btn-group { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
         button { padding: 12px 20px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; flex: 1; color: white; font-weight: bold;}
         .btn-start { background-color: #007bff; }
-        .btn-stop { background-color: #dc3545; }
+        .btn-stop { background-color: #6c757d; }
 
+        /* --- Histórico --- */
         #historico { 
             list-style: none; padding: 0; margin-top: 20px; text-align: left; 
             background: white; border-radius: 10px; overflow: hidden;
         }
         #historico li { 
-            padding: 10px 15px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 1rem;
-            display: flex; justify-content: space-between;
+            padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 0.95rem;
+            display: flex; flex-direction: column;
         }
-        #historico li:first-child { background-color: #e8f5e9; font-weight: bold; color: green;}
+        #historico li span.hist-nome { font-weight: bold; color: #333; }
+        #historico li span.hist-detalhe { font-size: 0.8rem; color: #666; display: flex; justify-content: space-between; margin-top: 4px; }
+        
+        .status-banco { margin-bottom: 10px; font-size: 0.8rem; color: #666; }
     </style>
 </head>
 <body>
 
-    <h2>📦 Leitor Rápido</h2>
+    <h2>📦 Estoque Inteligente</h2>
+    <div class="status-banco" id="status-db">Carregando banco de dados...</div>
     
     <div class="camera-wrapper">
         <div id="reader"></div>
         
         <div id="overlay-feedback">
-            LIDO! ✅
-            <div class="codigo-lido-overlay" id="txt-overlay">---</div>
+            <div class="titulo-feedback" id="txt-titulo">LIDO!</div>
+            <div class="nome-produto" id="txt-nome">---</div>
+            <div class="fornecedor-produto" id="txt-fornecedor">---</div>
+            <div class="codigo-lido-overlay" id="txt-ean">---</div>
         </div>
     </div>
 
     <div class="btn-group">
-        <button onclick="iniciarLeitura()" class="btn-start">▶ Iniciar</button>
+        <button onclick="iniciarLeitura()" class="btn-start">▶ Iniciar Câmera</button>
         <button onclick="pararLeitura()" class="btn-stop">⏹ Parar</button>
     </div>
 
-    <h3>Histórico Recente</h3>
+    <h3>Histórico</h3>
     <ul id="historico"></ul>
 
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -95,23 +98,54 @@
     <script>
         const html5QrCode = new Html5Qrcode("reader");
         const overlay = document.getElementById('overlay-feedback');
-        const txtOverlay = document.getElementById('txt-overlay');
+        const txtTitulo = document.getElementById('txt-titulo');
+        const txtNome = document.getElementById('txt-nome');
+        const txtFornecedor = document.getElementById('txt-fornecedor');
+        const txtEan = document.getElementById('txt-ean');
         const historicoEl = document.getElementById('historico');
+        const statusDbEl = document.getElementById('status-db');
+        
         let isScanning = false;
+        let bancoDeDados = []; // Variável que vai guardar o JSON
 
-        // Configuração de Áudio (BIP)
+        // 1. Carregar o Banco de Dados JSON ao abrir
+        fetch('./produtos.json')
+            .then(response => response.json())
+            .then(data => {
+                bancoDeDados = data;
+                statusDbEl.innerText = `✅ Banco carregado: ${data.length} produtos.`;
+                statusDbEl.style.color = "green";
+            })
+            .catch(error => {
+                console.error('Erro ao carregar JSON:', error);
+                statusDbEl.innerText = "❌ Erro ao carregar banco de produtos.";
+                statusDbEl.style.color = "red";
+            });
+
+        // Configuração de Áudio
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function tocarBip() {
+        function tocarBip(tipo) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
-            oscillator.type = "square";
-            oscillator.frequency.value = 660;
-            gainNode.gain.value = 0.1;
-            oscillator.start();
-            setTimeout(() => { oscillator.stop(); }, 150);
+            
+            if(tipo === 'sucesso') {
+                oscillator.type = "square";
+                oscillator.frequency.value = 660;
+                gainNode.gain.value = 0.1;
+                oscillator.start();
+                setTimeout(() => { oscillator.stop(); }, 150);
+            } else {
+                // Som de erro (grave)
+                oscillator.type = "sawtooth";
+                oscillator.frequency.value = 200;
+                gainNode.gain.value = 0.1;
+                oscillator.start();
+                setTimeout(() => { oscillator.stop(); }, 300);
+            }
+            
             if (navigator.vibrate) navigator.vibrate(200);
         }
 
@@ -120,29 +154,60 @@
         function onScanSuccess(decodedText, decodedResult) {
             if(!isScanning) return;
 
-            console.log(`Lido: ${decodedText}`);
+            // 2. Procurar no Banco de Dados
+            // O .find procura no array 'bancoDeDados' um item onde o 'ean' seja igual ao 'decodedText'
+            const produtoEncontrado = bancoDeDados.find(item => item.ean === decodedText);
+
+            if (produtoEncontrado) {
+                // ACHOU O PRODUTO
+                tocarBip('sucesso');
+                mostrarFeedbackVisual(true, "LIDO!", produtoEncontrado.nome, produtoEncontrado.fornecedor, decodedText);
+                adicionarAoHistorico(produtoEncontrado.nome, produtoEncontrado.fornecedor, decodedText);
+            } else {
+                // NÃO ACHOU (Produto Novo?)
+                tocarBip('erro');
+                mostrarFeedbackVisual(false, "NÃO CADASTRADO", "Desconhecido", "---", decodedText);
+                adicionarAoHistorico("Desconhecido", "Não cadastrado", decodedText);
+            }
+
+            // Pausa técnica
+            html5QrCode.pause(true); 
+            setTimeout(() => {
+                overlay.classList.remove("ativo"); 
+                html5QrCode.resume();
+            }, 2000); // 2 segundos para ler o feedback
+        }
+
+        function mostrarFeedbackVisual(sucesso, titulo, nome, fornecedor, ean) {
+            // Remove classes antigas
+            overlay.classList.remove("feedback-sucesso", "feedback-erro");
             
-            // 1. Som
-            tocarBip();
+            // Adiciona cor certa
+            if(sucesso) {
+                overlay.classList.add("feedback-sucesso");
+            } else {
+                overlay.classList.add("feedback-erro");
+            }
 
-            // 2. Feedback VISUAL NA CÂMERA (Ativa o CSS)
-            txtOverlay.innerText = decodedText;
-            overlay.classList.add("ativo"); // Torna visível
+            txtTitulo.innerText = titulo;
+            txtNome.innerText = nome;
+            txtFornecedor.innerText = fornecedor;
+            txtEan.innerText = `EAN: ${ean}`;
+            
+            overlay.classList.add("ativo");
+        }
 
-            // 3. Adicionar ao Histórico
+        function adicionarAoHistorico(nome, fornecedor, ean) {
             const li = document.createElement("li");
             const hora = new Date().toLocaleTimeString();
-            li.innerHTML = `<span>${decodedText}</span> <span>${hora}</span>`;
+            li.innerHTML = `
+                <span class="hist-nome">${nome}</span>
+                <span class="hist-detalhe">
+                    <span>${ean} • ${fornecedor}</span>
+                    <span>${hora}</span>
+                </span>
+            `;
             historicoEl.prepend(li);
-
-            // 4. Pausa técnica
-            html5QrCode.pause(true); 
-
-            // 5. Remove o feedback visual e retoma a leitura após 1.5s
-            setTimeout(() => {
-                overlay.classList.remove("ativo"); // Torna invisível de novo
-                html5QrCode.resume();
-            }, 1500);
         }
 
         function iniciarLeitura() {
