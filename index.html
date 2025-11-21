@@ -3,309 +3,352 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de Estoque Manual</title>
+    <title>App Estoque Pro</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 10px; background-color: #f4f4f4; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 0; margin: 0; background-color: #f0f2f5; }
         
-        /* --- Câmera e Overlay --- */
+        /* --- TELAS (SPA) --- */
+        .screen { display: none; padding: 20px; height: 100vh; box-sizing: border-box; }
+        .screen.active { display: flex; flex-direction: column; }
+
+        /* --- TELA: MENU INICIAL --- */
+        #screen-menu { justify-content: center; align-items: center; background: white; }
+        .menu-title { font-size: 2rem; margin-bottom: 40px; color: #333; }
+        .btn-menu {
+            width: 100%; max-width: 300px; padding: 20px; margin: 10px 0;
+            font-size: 1.2rem; font-weight: bold; border: none; border-radius: 12px;
+            cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn-consulta { background-color: #007bff; color: white; }
+        .btn-contagem { background-color: #28a745; color: white; }
+
+        /* --- TELA: SELEÇÃO DE PRODUTO --- */
+        .selecao-container { background: white; padding: 20px; border-radius: 10px; text-align: left; }
+        select { width: 100%; padding: 15px; font-size: 1rem; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+
+        /* --- CAMERA E OVERLAYS --- */
         .camera-wrapper {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
-            border-radius: 10px;
-            overflow: hidden;
-            background: black;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            position: relative; width: 100%; max-width: 500px; margin: 0 auto;
+            border-radius: 10px; overflow: hidden; background: black; flex-grow: 1; display: flex; align-items: center;
         }
+        #reader { width: 100%; height: 100%; object-fit: cover; }
 
-        #reader { width: 100%; }
-
-        /* O Aviso Visual (HUD) - Agora com fundo sólido para leitura */
+        /* Overlay Genérico (Feedback) */
         #overlay-feedback {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 10;
-            
-            /* Inicialmente escondido */
-            visibility: hidden; 
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            
-            padding: 20px;
-            box-sizing: border-box;
-            background-color: rgba(0, 0, 0, 0.85); /* Fundo escuro para destacar os botões */
-            backdrop-filter: blur(5px); /* Borra o fundo da câmera */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: white; z-index: 20; visibility: hidden; opacity: 0;
+            transition: opacity 0.2s; background-color: rgba(0,0,0,0.9); padding: 20px; box-sizing: border-box;
         }
+        #overlay-feedback.ativo { visibility: visible; opacity: 1; pointer-events: auto; }
 
-        #overlay-feedback.ativo {
-            visibility: visible;
-            opacity: 1;
-            pointer-events: auto; /* Ativa o clique nos botões */
+        /* Estilos de texto do Overlay */
+        .titulo-feedback { font-size: 1.8rem; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
+        .info-feedback { font-size: 1.1rem; margin-bottom: 5px; color: #ddd; }
+        .info-destaque { font-size: 1.4rem; font-weight: bold; color: #fff; margin-bottom: 20px; }
+
+        /* Botões do Overlay */
+        .overlay-buttons { display: flex; gap: 15px; width: 100%; }
+        .btn-overlay { padding: 15px; border: none; border-radius: 8px; font-weight: bold; flex: 1; font-size: 1rem; }
+        .btn-confirmar { background: #28a745; color: white; }
+        .btn-cancelar { background: #dc3545; color: white; }
+        .btn-voltar { background: #6c757d; color: white; margin-bottom: 10px; padding: 10px; width: 100%; border:none; border-radius: 5px; font-size: 1rem;}
+
+        /* Painel de Contagem (Topo da Câmera) */
+        .painel-contagem {
+            background: #333; color: white; padding: 10px; 
+            display: flex; justify-content: space-between; align-items: center;
+            border-radius: 8px 8px 0 0; margin-bottom: -5px; z-index: 5;
         }
-
-        /* Textos do Overlay */
-        .titulo-feedback { font-size: 1.5rem; font-weight: 900; margin-bottom: 15px; text-transform: uppercase; }
-        .nome-produto { font-size: 1.3rem; font-weight: bold; margin-bottom: 5px; color: #fff; }
-        .fornecedor-produto { font-size: 1rem; font-style: italic; color: #ccc; margin-bottom: 15px; }
-        .codigo-lido-overlay { font-size: 0.9rem; margin-bottom: 20px; color: #aaa; border: 1px solid #555; padding: 5px 10px; border-radius: 4px; }
-
-        /* Botões de Ação dentro da Câmera */
-        .overlay-buttons {
-            display: flex;
-            gap: 15px;
-            width: 100%;
-            justify-content: center;
-        }
-
-        .btn-overlay {
-            padding: 15px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-        }
-
-        .btn-confirmar { background-color: #28a745; color: white; box-shadow: 0 4px 0 #1e7e34; }
-        .btn-confirmar:active { transform: translateY(4px); box-shadow: none; }
-
-        .btn-cancelar { background-color: #dc3545; color: white; box-shadow: 0 4px 0 #bd2130; }
-        .btn-cancelar:active { transform: translateY(4px); box-shadow: none; }
-
-        /* Cores do Título baseadas no status */
-        .status-sucesso { color: #28a745; }
-        .status-erro { color: #dc3545; }
-
-        /* --- Botões Principais --- */
-        .btn-group { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
-        button.main-btn { padding: 12px 20px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; flex: 1; color: white; font-weight: bold;}
-        .btn-start { background-color: #007bff; }
-        .btn-stop { background-color: #6c757d; }
-
-        /* --- Histórico --- */
-        #historico { 
-            list-style: none; padding: 0; margin-top: 20px; text-align: left; 
-            background: white; border-radius: 10px; overflow: hidden;
-        }
-        #historico li { 
-            padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 0.95rem;
-            display: flex; flex-direction: column;
-        }
-        #historico li span.hist-nome { font-weight: bold; color: #333; }
-        #historico li span.hist-detalhe { font-size: 0.8rem; color: #666; display: flex; justify-content: space-between; margin-top: 4px; }
-        
-        .status-banco { margin-bottom: 10px; font-size: 0.8rem; color: #666; }
+        .contador-numero { font-size: 1.5rem; font-weight: bold; color: #00ffea; }
     </style>
 </head>
 <body>
 
-    <h2>📦 Estoque Manual</h2>
-    <div class="status-banco" id="status-db">Carregando banco de dados...</div>
-    
-    <div class="camera-wrapper">
-        <div id="reader"></div>
+    <div id="screen-menu" class="screen active">
+        <div class="menu-title">📦 App Estoque</div>
+        <div id="status-db" style="margin-bottom: 20px; font-size: 0.9rem; color: #666;">Carregando dados...</div>
         
-        <div id="overlay-feedback">
-            <div class="titulo-feedback" id="txt-titulo">LIDO!</div>
-            
-            <div class="nome-produto" id="txt-nome">---</div>
-            <div class="fornecedor-produto" id="txt-fornecedor">---</div>
-            <div class="codigo-lido-overlay" id="txt-ean">EAN: ---</div>
-            
-            <div class="overlay-buttons">
-                <button onclick="cancelarLeitura()" class="btn-overlay btn-cancelar">Cancelar ❌</button>
-                <button onclick="confirmarLeitura()" class="btn-overlay btn-confirmar">CONFIRMAR ✅</button>
-            </div>
+        <button onclick="irParaConsulta()" class="btn-menu btn-consulta">🔍 CONSULTAR PRODUTO</button>
+        <button onclick="irParaSelecaoContagem()" class="btn-menu btn-contagem">🔢 INICIAR CONTAGEM</button>
+    </div>
+
+    <div id="screen-selecao" class="screen">
+        <button onclick="voltarMenu()" class="btn-voltar">⬅ Voltar</button>
+        <h2>Selecione o Produto</h2>
+        <div class="selecao-container">
+            <label>Qual produto você vai contar?</label>
+            <select id="select-produto">
+                <option value="">Carregando lista...</option>
+            </select>
+            <br><br>
+            <button onclick="iniciarContagem()" class="btn-menu btn-contagem" style="width:100%">COMEÇAR ▶</button>
         </div>
     </div>
 
-    <div class="btn-group">
-        <button onclick="iniciarLeitura()" class="main-btn btn-start">▶ Iniciar Câmera</button>
-        <button onclick="pararLeitura()" class="main-btn btn-stop">⏹ Parar</button>
+    <div id="screen-camera" class="screen" style="background: #222; padding: 10px;">
+        <div id="header-contagem" class="painel-contagem" style="display:none;">
+            <span id="lbl-produto-alvo" style="font-size: 0.9rem;">---</span>
+            <div>Qtd: <span id="lbl-qtd" class="contador-numero">0</span></div>
+        </div>
+
+        <div class="camera-wrapper">
+            <div id="reader"></div>
+
+            <div id="overlay-feedback">
+                <div class="titulo-feedback" id="ov-titulo">TITULO</div>
+                <div class="info-feedback" id="ov-desc">Descrição</div>
+                <div class="info-destaque" id="ov-produto">Nome do Produto</div>
+                
+                <div id="btns-consulta" class="overlay-buttons" style="display:none;">
+                    <button onclick="fecharOverlay()" class="btn-overlay btn-confirmar">OK</button>
+                </div>
+
+                <div id="btns-erro" class="overlay-buttons" style="display:none;">
+                    <button onclick="fecharOverlay()" class="btn-overlay btn-cancelar">ENTENDI</button>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="pararTudoEVoltar()" class="btn-voltar" style="margin-top: 15px;">⏹ Encerrar</button>
     </div>
 
-    <h3>Histórico Confirmado</h3>
-    <ul id="historico"></ul>
-
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
     <script>
-        const html5QrCode = new Html5Qrcode("reader");
-        const overlay = document.getElementById('overlay-feedback');
-        const txtTitulo = document.getElementById('txt-titulo');
-        const txtNome = document.getElementById('txt-nome');
-        const txtFornecedor = document.getElementById('txt-fornecedor');
-        const txtEan = document.getElementById('txt-ean');
-        const historicoEl = document.getElementById('historico');
-        const statusDbEl = document.getElementById('status-db');
+        // --- ESTADO DO APLICATIVO ---
+        let bancoDeDados = [];
+        let html5QrCode = null;
+        let modoAtual = ''; // 'consulta' ou 'contagem'
         
-        let isScanning = false;
-        let bancoDeDados = []; 
-        
-        // Variável temporária para guardar o que foi lido antes de confirmar
-        let leituraPendente = null;
+        // Variáveis de Contagem
+        let produtoAlvo = null; // O objeto do produto selecionado
+        let contadorAtual = 0;
+        let isProcessing = false; // Evitar leituras duplas rápidas
 
-        // Carregar JSON
-        fetch('./bancoprodutos.json')
-            .then(response => {
-                if (!response.ok) { throw new Error("Arquivo não encontrado"); }
-                return response.json();
-            })
-            .then(data => {
-                bancoDeDados = data;
-                statusDbEl.innerText = `✅ Banco carregado: ${data.length} produtos.`;
-                statusDbEl.style.color = "green";
-            })
-            .catch(error => {
-                console.error('Erro ao carregar JSON:', error);
-                statusDbEl.innerText = "❌ Erro: Não achei o arquivo 'bancoprodutos.json'.";
-                statusDbEl.style.color = "red";
-            });
+        // --- INICIALIZAÇÃO ---
+        window.onload = () => {
+            carregarBanco();
+        };
 
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function tocarBip(tipo) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            
-            if(tipo === 'sucesso') {
-                oscillator.type = "square";
-                oscillator.frequency.value = 660;
-                gainNode.gain.value = 0.1;
-                oscillator.start();
-                setTimeout(() => { oscillator.stop(); }, 150);
-            } else {
-                oscillator.type = "sawtooth";
-                oscillator.frequency.value = 200;
-                gainNode.gain.value = 0.1;
-                oscillator.start();
-                setTimeout(() => { oscillator.stop(); }, 300);
-            }
-            if (navigator.vibrate) navigator.vibrate(200);
+        function carregarBanco() {
+            fetch('./bancoprodutos.json')
+                .then(res => { if(!res.ok) throw new Error(); return res.json(); })
+                .then(data => {
+                    bancoDeDados = data;
+                    document.getElementById('status-db').innerText = `✅ ${data.length} produtos carregados.`;
+                    document.getElementById('status-db').style.color = "green";
+                    preencherSelect();
+                })
+                .catch(() => {
+                    document.getElementById('status-db').innerText = "❌ Erro ao carregar JSON.";
+                    document.getElementById('status-db').style.color = "red";
+                });
         }
 
-        const config = { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+        function preencherSelect() {
+            const sel = document.getElementById('select-produto');
+            sel.innerHTML = '<option value="">-- Escolha um produto --</option>';
+            // Ordenar alfabeticamente
+            bancoDeDados.sort((a,b) => a.nome.localeCompare(b.nome));
+            
+            bancoDeDados.forEach(prod => {
+                const opt = document.createElement('option');
+                opt.value = prod.ean; // O valor será o EAN
+                opt.innerText = prod.nome;
+                sel.appendChild(opt);
+            });
+        }
+
+        // --- NAVEGAÇÃO (SPA) ---
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function voltarMenu() {
+            pararCameraSeLigada();
+            showScreen('screen-menu');
+        }
+
+        function irParaConsulta() {
+            modoAtual = 'consulta';
+            document.getElementById('header-contagem').style.display = 'none';
+            showScreen('screen-camera');
+            iniciarCamera();
+        }
+
+        function irParaSelecaoContagem() {
+            showScreen('screen-selecao');
+        }
+
+        function iniciarContagem() {
+            const eanSelecionado = document.getElementById('select-produto').value;
+            if(!eanSelecionado) { alert("Selecione um produto!"); return; }
+
+            // Configurar ambiente de contagem
+            modoAtual = 'contagem';
+            produtoAlvo = bancoDeDados.find(p => p.ean === eanSelecionado);
+            contadorAtual = 0;
+
+            // Atualizar Header
+            document.getElementById('lbl-produto-alvo').innerText = produtoAlvo.nome;
+            document.getElementById('lbl-qtd').innerText = "0";
+            document.getElementById('header-contagem').style.display = 'flex';
+
+            showScreen('screen-camera');
+            iniciarCamera();
+        }
+
+        function pararTudoEVoltar() {
+            if(modoAtual === 'contagem') {
+                if(!confirm("Deseja encerrar a contagem atual?")) return;
+            }
+            voltarMenu();
+        }
+
+        // --- LÓGICA DA CÂMERA ---
+        function iniciarCamera() {
+            if(html5QrCode) return; // Já iniciada
+
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+            
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+            .catch(err => { alert("Erro na câmera: " + err); voltarMenu(); });
+        }
+
+        function pararCameraSeLigada() {
+            if(html5QrCode) {
+                html5QrCode.stop().then(() => { html5QrCode.clear(); html5QrCode = null; })
+                .catch(() => { html5QrCode = null; });
+            }
+        }
 
         function onScanSuccess(decodedText, decodedResult) {
-            if(!isScanning) return;
+            if(isProcessing) return; // Trava leitura enquanto processa a anterior
 
-            // 1. PAUSAR O SCANNER IMEDIATAMENTE
-            html5QrCode.pause(true); 
-
-            // 2. BUSCAR NO BANCO
-            const produtoEncontrado = bancoDeDados.find(item => 
-                item.ean === decodedText || 
-                item.ean === "0" + decodedText || 
-                "0" + item.ean === decodedText
+            // 1. Normalização do Código (Mattel UPC vs EAN)
+            let codigoLido = decodedText;
+            // Se não achar direto, tenta com zero ou sem zero
+            const achouNoBanco = bancoDeDados.find(item => 
+                item.ean === codigoLido || item.ean === "0" + codigoLido || "0" + item.ean === codigoLido
             );
+            // Se achou usando a lógica do zero, atualiza o codigoLido para bater com o banco
+            if(achouNoBanco) codigoLido = achouNoBanco.ean;
 
-            // 3. PREPARAR OS DADOS PENDENTES (Mas não salvar no histórico ainda)
-            if (produtoEncontrado) {
-                tocarBip('sucesso');
-                leituraPendente = {
-                    nome: produtoEncontrado.nome,
-                    fornecedor: produtoEncontrado.fornecedor,
-                    ean: decodedText,
-                    encontrado: true
-                };
-            } else {
-                tocarBip('erro');
-                leituraPendente = {
-                    nome: "PRODUTO NÃO CADASTRADO",
-                    fornecedor: "---",
-                    ean: decodedText,
-                    encontrado: false
-                };
+
+            // --- BRANCH: MODO CONSULTA ---
+            if(modoAtual === 'consulta') {
+                fazerPauseMomentaneo();
+                if(achouNoBanco) {
+                    tocarSom('sucesso');
+                    mostrarOverlay('consulta', 'ENCONTRADO ✅', achouNoBanco.nome, achouNoBanco.fornecedor);
+                } else {
+                    tocarSom('erro');
+                    mostrarOverlay('consulta', 'NÃO CADASTRADO ❌', 'Desconhecido', `Cód: ${decodedText}`);
+                }
             }
 
-            // 4. MOSTRAR O POPUP PARA O USUÁRIO DECIDIR
-            abrirOverlayConfirmacao();
+            // --- BRANCH: MODO CONTAGEM ---
+            else if(modoAtual === 'contagem') {
+                // Verifica se é o produto que estamos contando
+                if(achouNoBanco && achouNoBanco.ean === produtoAlvo.ean) {
+                    // É O CERTO!
+                    contadorAtual++;
+                    document.getElementById('lbl-qtd').innerText = contadorAtual;
+                    tocarSom('sucesso');
+                    
+                    // Feedback visual rápido (flash verde na borda ou overlay temporário)
+                    flashFeedback(true);
+                    
+                    // Pequena pausa para não ler 2 vezes o mesmo frame
+                    pausarLerNovamenteRapido();
+
+                } else {
+                    // É O ERRADO!
+                    fazerPauseMomentaneo();
+                    tocarSom('erro');
+                    let nomeErrado = achouNoBanco ? achouNoBanco.nome : "Produto Desconhecido";
+                    mostrarOverlay('erro', 'PRODUTO ERRADO! ⛔', `Você leu: ${nomeErrado}`, `Deveria ser: ${produtoAlvo.nome}`);
+                }
+            }
         }
 
-        function abrirOverlayConfirmacao() {
-            if(!leituraPendente) return;
+        // --- UTILITÁRIOS DE INTERFACE ---
+        
+        function mostrarOverlay(tipo, titulo, destaque, info) {
+            const ov = document.getElementById('overlay-feedback');
+            document.getElementById('ov-titulo').innerText = titulo;
+            document.getElementById('ov-produto').innerText = destaque;
+            document.getElementById('ov-desc').innerText = info;
 
-            // Preenche os textos
-            txtNome.innerText = leituraPendente.nome;
-            txtFornecedor.innerText = leituraPendente.fornecedor;
-            txtEan.innerText = `CÓD: ${leituraPendente.ean}`;
+            // Botões
+            document.getElementById('btns-consulta').style.display = 'none';
+            document.getElementById('btns-erro').style.display = 'none';
 
-            if(leituraPendente.encontrado) {
-                txtTitulo.innerText = "ENCONTRADO";
-                txtTitulo.className = "titulo-feedback status-sucesso";
-            } else {
-                txtTitulo.innerText = "DESCONHECIDO";
-                txtTitulo.className = "titulo-feedback status-erro";
+            if(tipo === 'consulta') {
+                document.getElementById('btns-consulta').style.display = 'flex';
+                document.getElementById('ov-titulo').style.color = titulo.includes('NÃO') ? '#dc3545' : '#28a745';
+            } else if (tipo === 'erro') {
+                document.getElementById('btns-erro').style.display = 'flex';
+                document.getElementById('ov-titulo').style.color = '#dc3545';
             }
 
-            // Mostra o overlay
-            overlay.classList.add("ativo");
+            ov.classList.add('ativo');
         }
 
-        // --- AÇÃO: USUÁRIO CLICOU EM CONFIRMAR ---
-        function confirmarLeitura() {
-            if(leituraPendente) {
-                // Agora sim adiciona ao histórico
-                adicionarAoHistorico(leituraPendente.nome, leituraPendente.fornecedor, leituraPendente.ean);
-                leituraPendente = null; // Limpa a pendência
-            }
-            
-            fecharOverlayERetomar();
-        }
-
-        // --- AÇÃO: USUÁRIO CLICOU EM CANCELAR ---
-        function cancelarLeitura() {
-            console.log("Leitura cancelada pelo usuário");
-            leituraPendente = null; // Descarta a leitura
-            fecharOverlayERetomar();
-        }
-
-        function fecharOverlayERetomar() {
-            overlay.classList.remove("ativo");
-            
-            // Pequeno delay para a animação terminar antes de ligar a câmera de novo
+        function fecharOverlay() {
+            document.getElementById('overlay-feedback').classList.remove('ativo');
             setTimeout(() => {
-                if(isScanning) html5QrCode.resume();
-            }, 300);
+                 if(html5QrCode) html5QrCode.resume();
+                 isProcessing = false;
+            }, 200);
         }
 
-        function adicionarAoHistorico(nome, fornecedor, ean) {
-            const li = document.createElement("li");
-            const hora = new Date().toLocaleTimeString();
+        // Pausa a câmera e exige clique para voltar (usado em consulta e erros)
+        function fazerPauseMomentaneo() {
+            isProcessing = true;
+            if(html5QrCode) html5QrCode.pause(true);
+        }
+
+        // Pausa rápida e volta sozinho (usado na contagem bem sucedida)
+        function pausarLerNovamenteRapido() {
+            isProcessing = true;
+            if(html5QrCode) html5QrCode.pause(true);
             
-            // Ícone visual se foi cadastrado ou não
-            const cor = nome === "PRODUTO NÃO CADASTRADO" ? "red" : "black";
-
-            li.innerHTML = `
-                <span class="hist-nome" style="color:${cor}">${nome}</span>
-                <span class="hist-detalhe">
-                    <span>${ean}</span>
-                    <span>${hora}</span>
-                </span>
-            `;
-            historicoEl.prepend(li);
+            setTimeout(() => {
+                if(html5QrCode) html5QrCode.resume();
+                isProcessing = false;
+            }, 1200); // 1.2 segundos de intervalo entre contagens
         }
 
-        function iniciarLeitura() {
-            if(isScanning) return;
-            isScanning = true;
-            overlay.classList.remove("ativo"); // Garante que overlay comece fechado
-            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-            .catch(err => alert("Erro: " + err));
+        function flashFeedback(sucesso) {
+            const wrapper = document.querySelector('.camera-wrapper');
+            wrapper.style.border = sucesso ? "5px solid #00ff00" : "5px solid red";
+            setTimeout(() => {
+                wrapper.style.border = "none";
+            }, 500);
         }
 
-        function pararLeitura() {
-            isScanning = false;
-            html5QrCode.stop().then(() => console.log("Parado")).catch(err => console.log(err));
+        // --- SOM ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function tocarSom(tipo) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if(tipo === 'sucesso') {
+                osc.type = "square"; osc.frequency.value = 800; gain.gain.value = 0.1;
+                osc.start(); setTimeout(() => osc.stop(), 100);
+            } else {
+                osc.type = "sawtooth"; osc.frequency.value = 200; gain.gain.value = 0.1;
+                osc.start(); setTimeout(() => osc.stop(), 400);
+            }
+            if (navigator.vibrate) navigator.vibrate(200);
         }
     </script>
 </body>
